@@ -1,0 +1,6 @@
+{
+  "name": "Islam.ai: Ёвари Қуръон ва Ҳадис",
+  "description": "Як ёрдамчии AI, ки танҳо аз Қуръони Карим ва Саҳеҳи Бухорӣ, Саҳеҳи Муслим ва дигар китобҳои муътабари ҳадис ҷавоб медиҳад.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": []
+}
