@@ -45,10 +45,19 @@ export default function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [background, setBackground] = useState<string | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bgInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const savedBg = localStorage.getItem('islam_ai_bg');
+    if (savedBg) {
+      setBackground(savedBg);
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -143,6 +152,24 @@ export default function App() {
     }
   };
 
+  const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setBackground(base64String);
+        localStorage.setItem('islam_ai_bg', base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const resetBackground = () => {
+    setBackground(null);
+    localStorage.removeItem('islam_ai_bg');
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -190,17 +217,22 @@ export default function App() {
   };
 
   return (
-    <div 
-      className="flex h-[100dvh] overflow-hidden text-[13px] relative font-sans"
-      style={{ 
-        backgroundImage: `url('https://images.unsplash.com/photo-1604147708224-4962d19b807c?auto=format&fit=crop&q=80&w=2000')`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
-      }}
-    >
-      {/* Subtle warm overlay to increase color saturation slightly as requested */}
-      <div className="absolute inset-0 bg-orange-900/5 pointer-events-none z-0"></div>
+    <div className="flex h-[100dvh] overflow-hidden text-[13px] relative font-sans bg-white">
+      {/* Background layer */}
+      {background && (
+        <div 
+          className="absolute inset-0 z-0"
+          style={{ 
+            backgroundImage: `url('${background}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            filter: 'saturate(1.2) contrast(1.05)',
+          }}
+        />
+      )}
+      {/* Subtle overlay only if background exists */}
+      {background && <div className="absolute inset-0 bg-white/10 pointer-events-none z-0"></div>}
       
       {/* Sidebar for History */}
       <AnimatePresence>
@@ -225,9 +257,34 @@ export default function App() {
                   <History className="w-4 h-4" />
                   Таърихи чатҳо
                 </span>
-                <button onClick={() => setIsHistoryOpen(false)} className="p-2 hover:bg-stone-200/50 rounded-full transition-colors">
-                  <X className="w-5 h-5 text-stone-500" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <input 
+                    type="file" 
+                    ref={bgInputRef} 
+                    accept="image/*"
+                    onChange={handleBgUpload} 
+                    className="hidden" 
+                  />
+                  <button 
+                    onClick={() => bgInputRef.current?.click()}
+                    className="p-1.5 hover:bg-stone-200 rounded-lg text-emerald-600 transition-all flex items-center gap-1 text-[10px] font-bold border border-emerald-100 bg-emerald-50"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Фон
+                  </button>
+                  {background && (
+                    <button 
+                      onClick={resetBackground}
+                      className="p-1.5 hover:bg-rose-100 rounded-lg text-rose-500 transition-all"
+                      title="Тоза кардани фон"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button onClick={() => setIsHistoryOpen(false)} className="p-2 hover:bg-stone-200/50 rounded-full transition-colors">
+                    <X className="w-5 h-5 text-stone-500" />
+                  </button>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
                 {chats.length === 0 ? (
