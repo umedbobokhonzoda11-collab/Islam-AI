@@ -81,11 +81,14 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Only scroll to bottom when the user sends a new message
-    if (scrollRef.current && messages.length > 0 && messages[messages.length - 1].role === 'user') {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    // Scroll to bottom whenever messages list is updated
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
-  }, [messages]);
+  }, [messages, isLoading]);
 
   // Speech Recognition Setup
   useEffect(() => {
@@ -187,18 +190,17 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-[100dvh] bg-[#fdfbf7] overflow-hidden text-[13px] relative font-sans">
-      {/* Sophisticated Islamic Layout Enhancements */}
-      <div className="absolute inset-0 bg-radial-[circle_at_center,_var(--tw-gradient-stops)] from-white/60 via-transparent to-transparent pointer-events-none z-0"></div>
-      
-      {/* Ornate Islamic Star Pattern Overlay */}
-      <div 
-        className="absolute inset-0 opacity-[0.04] pointer-events-none z-0" 
-        style={{ 
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0l5 15 15 5-15 5-5 15-5-15-15-5 15-5z' fill='%231a1a1a'/%3E%3Ccircle cx='30' cy='30' r='2' fill='%231a1a1a'/%3E%3C/svg%3E")`,
-          backgroundSize: '80px 80px'
-        }}
-      ></div>
+    <div 
+      className="flex h-[100dvh] overflow-hidden text-[13px] relative font-sans"
+      style={{ 
+        backgroundImage: `url('https://images.unsplash.com/photo-1604147708224-4962d19b807c?auto=format&fit=crop&q=80&w=2000')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      {/* Subtle warm overlay to increase color saturation slightly as requested */}
+      <div className="absolute inset-0 bg-orange-900/5 pointer-events-none z-0"></div>
       
       {/* Sidebar for History */}
       <AnimatePresence>
@@ -384,7 +386,9 @@ export default function App() {
                         "max-w-[95%] sm:max-w-[85%] relative",
                         msg.role === 'user' 
                           ? "bg-stone-900 text-white px-5 py-3 rounded-2xl rounded-tr-none text-[14px] shadow-lg" 
-                          : "text-stone-800 w-full"
+                          : msg.text.startsWith('⚠️')
+                            ? "bg-rose-50 border border-rose-100 text-rose-800 px-5 py-4 rounded-2xl text-[14px] shadow-sm w-full"
+                            : "text-stone-800 w-full"
                       )}>
                         {msg.role === 'model' ? (
                           <div className="flex gap-4">

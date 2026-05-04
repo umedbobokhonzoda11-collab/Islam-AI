@@ -37,7 +37,7 @@ export interface Message {
 export async function getChatResponse(messages: Message[]) {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-3-flash-preview",
       contents: messages.map(m => ({
         role: m.role,
         parts: [{ text: m.text }]
@@ -62,13 +62,24 @@ export async function getChatResponse(messages: Message[]) {
     }
     
     const errorMessage = error?.message || "";
-    if (errorMessage.includes("API key not valid")) {
-      return "Хатогӣ: Калиди API (API Key) нодуруст аст. Лутфан калиди дурустро ворид кунед.";
+    const status = error?.status;
+
+    if (isApiKeyMissing) {
+      return "⚠️ **ХАТОГӢ: API Key ёфт нашуд.**\n\nБарои он ки AI кор кунад, шумо бояд калиди Gemini API-ро дар танзимот илова кунед. Агар дар Vercel бошед, ба Environment Variables дароед ва `VITE_GEMINI_API_KEY`-ро илова кунед.";
     }
-    if (errorMessage.includes("quota")) {
-      return "Хатогӣ: Квотаи Gemini тамом шуд. Лутфан каме сабр кунед ва дубора кӯшиш кунед.";
+    
+    if (errorMessage.includes("API key not valid") || status === 403) {
+      return "⚠️ **ХАТОГӢ: Калиди API нодуруст аст.**\n\nЛутфан калиди худро дар [Google AI Studio](https://aistudio.google.com/app/apikey) санҷед ва онро дубора ворид кунед.";
     }
 
-    return `Хатогии техникӣ: ${errorMessage || "Пайваст бо сервер қатъ шуд. Лутфан дубора кӯшиш кунед."}`;
+    if (errorMessage.includes("quota") || status === 429) {
+      return "⚠️ **ХАТОГӢ: Квота тамом шуд.**\n\nШумо лимити ройгони Gemini-ро истифода бурдед. Лутфан пас аз 1 дақиқа дубора кӯшиш кунед.";
+    }
+
+    if (errorMessage.includes("model not found") || errorMessage.includes("404")) {
+      return "⚠️ **ХАТОГӢ: Модел ёфт нашуд.**\n\nМушкилии техникӣ дар сервер. Мо кӯшиш дорем онро ислоҳ кунем.";
+    }
+
+    return `⚠️ **ХАТОГИИ ТЕХНИКӢ:**\n\n${errorMessage || "Пайваст бо сервер қатъ шуд. Лутфан дубора кӯшиш кунед."}`;
   }
 }
