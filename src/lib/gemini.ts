@@ -1,12 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 
-// For Vite/Vercel, we need to check both import.meta.env and process.env
-// In AI Studio, GEMINI_API_KEY is usually injected via process.env by vite.config.ts define.
-// In Vercel (Vite), we prefer VITE_GEMINI_API_KEY for client exposure.
-// @ts-ignore - process might be undefined at runtime but handled by vite define
-const API_KEY = (import.meta.env.VITE_GEMINI_API_KEY) || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined) || (import.meta.env.GEMINI_API_KEY);
+// @ts-ignore - process.env is injected by vite.config.ts during build
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined);
 
-if (!API_KEY) {
+export const isApiKeyMissing = !API_KEY || API_KEY === "undefined" || API_KEY === "";
+
+if (isApiKeyMissing) {
   console.error("GEMINI_API_KEY is missing! If you are on Vercel, add VITE_GEMINI_API_KEY to your Environment Variables.");
 }
 
@@ -38,14 +37,14 @@ export interface Message {
 export async function getChatResponse(messages: Message[]) {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: messages.map(m => ({
         role: m.role,
         parts: [{ text: m.text }]
       })),
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.3, // Lower temperature for more accurate and factual responses
+        temperature: 0.3,
         maxOutputTokens: 2048,
       }
     });
@@ -58,10 +57,18 @@ export async function getChatResponse(messages: Message[]) {
   } catch (error: any) {
     console.error("Gemini API Error:", error);
     
-    if (!API_KEY) {
+    if (isApiKeyMissing) {
       return "Хатогӣ: API Key ёфт нашуд. Агар шумо ин барномаро дар Vercel истифода мебаред, лутфан VITE_GEMINI_API_KEY-ро дар танзимот (Environment Variables) илова кунед.";
     }
     
-    return "Хатогии техникӣ: Пайваст бо сервер қатъ шуд ё квота тамом шуд. Лутфан пас аз чанд сония дубора кӯшиш кунед.";
+    const errorMessage = error?.message || "";
+    if (errorMessage.includes("API key not valid")) {
+      return "Хатогӣ: Калиди API (API Key) нодуруст аст. Лутфан калиди дурустро ворид кунед.";
+    }
+    if (errorMessage.includes("quota")) {
+      return "Хатогӣ: Квотаи Gemini тамом шуд. Лутфан каме сабр кунед ва дубора кӯшиш кунед.";
+    }
+
+    return `Хатогии техникӣ: ${errorMessage || "Пайваст бо сервер қатъ шуд. Лутфан дубора кӯшиш кунед."}`;
   }
 }
