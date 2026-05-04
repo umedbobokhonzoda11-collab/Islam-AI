@@ -267,10 +267,10 @@ export default function App() {
                   />
                   <button 
                     onClick={() => bgInputRef.current?.click()}
-                    className="p-1.5 hover:bg-stone-200 rounded-lg text-emerald-600 transition-all flex items-center gap-1 text-[10px] font-bold border border-emerald-100 bg-emerald-50"
+                    className="p-1.5 hover:bg-stone-200 rounded-lg text-emerald-600 transition-all flex items-center justify-center border border-emerald-100 bg-emerald-50"
+                    title="Ивази фон"
                   >
-                    <Plus className="w-3 h-3" />
-                    Фон
+                    <Plus className="w-4 h-4" />
                   </button>
                   {background && (
                     <button 
@@ -357,8 +357,7 @@ export default function App() {
               <Menu className="w-5 h-5 text-stone-700" />
             </button>
             <div className="flex flex-col">
-              <span className="text-[14px] font-bold text-stone-900 tracking-tight leading-none">Islam.ai</span>
-              <span className="text-[9px] text-stone-500 font-medium">Танҳо аз сарчашмаҳои боэътимод</span>
+              <span className="text-[16px] font-bold text-stone-900 tracking-tight leading-none">Қуръон ва Ҳадис</span>
             </div>
           </div>
           <button 
@@ -400,17 +399,7 @@ export default function App() {
           >
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12 px-6 text-center relative z-10">
-                <motion.div 
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="w-20 h-20 bg-stone-900 rounded-[2rem] flex items-center justify-center shadow-2xl mb-4 rotate-3"
-                >
-                  <Sparkles className="w-10 h-10 text-white" />
-                </motion.div>
                 <div className="space-y-4">
-                  <h2 className="text-2xl md:text-3xl font-extrabold text-stone-800 leading-tight max-w-md tracking-tight">
-                    Ассалому алайкум
-                  </h2>
                   <p className="text-stone-500 text-sm md:text-base max-w-sm mx-auto leading-relaxed">
                     Ба шумо чӣ тавр кӯмак карда метавонам? Пурсишҳои худро дар бораи дин нависед.
                   </p>
@@ -546,9 +535,6 @@ export default function App() {
                 </button>
               </div>
             </div>
-            <p className="text-[9px] text-stone-400 text-center font-medium">
-              Islam.ai метавонад баъзан хато кунад. Лутфан бо аҳли илм низ машварат кунед.
-            </p>
           </div>
         </div>
       </div>
