@@ -9,7 +9,8 @@ import {
   orderBy, 
   serverTimestamp,
   Timestamp,
-  updateDoc
+  updateDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 
@@ -89,6 +90,16 @@ export const saveMessage = async (chatId: string, role: 'user' | 'model', text: 
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
+  }
+};
+
+export const deleteChat = async (chatId: string) => {
+  const path = `chats/${chatId}`;
+  try {
+    await deleteDoc(doc(db, 'chats', chatId));
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 };
 

@@ -9,8 +9,6 @@ import {
   User as UserIcon, 
   RotateCcw, 
   Plus, 
-  Mic, 
-  AudioLines, 
   Sparkles,
   ArrowUp,
   BookOpen,
@@ -26,7 +24,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { auth, signInWithGoogle } from './lib/firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { createChat, saveMessage, getChats, getMessages, Chat } from './lib/chats';
+import { createChat, saveMessage, getChats, getMessages, deleteChat, Chat } from './lib/chats';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -39,8 +37,6 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -50,8 +46,7 @@ export default function App() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
-
+  
   useEffect(() => {
     const savedBg = localStorage.getItem('islam_ai_bg');
     if (savedBg) {
@@ -89,61 +84,37 @@ export default function App() {
     setIsLoading(false);
   };
 
+  const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
+    e.stopPropagation();
+    if (window.confirm('Мехоҳед ин чатро нест кунед?')) {
+      await deleteChat(chatId);
+      setChats(prev => prev.filter(c => c.id !== chatId));
+      if (activeChatId === chatId) {
+        startNewChat();
+      }
+    }
+  };
+
   useEffect(() => {
-    // Scroll to bottom whenever messages list is updated
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth'
-      });
+    // Scroll logic: show the start of the response if it's from the model
+    if (scrollRef.current && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'model' && !isLoading) {
+        // Find the last element in the message list and scroll into view roughly
+        const container = scrollRef.current;
+        const lastMsgHeaderHeight = 100; // Small buffer
+        container.scrollTo({
+          top: container.scrollHeight - 800, // Adjust to show top of long model response
+          behavior: 'smooth'
+        });
+      } else {
+        scrollRef.current.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
     }
   }, [messages, isLoading]);
-
-  // Speech Recognition Setup
-  useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'tg-TJ'; // Attempt Tajik, fallback to auto
-
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(prev => prev + ' ' + transcript);
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
-    }
-  }, []);
-
-  const toggleListening = () => {
-    if (isListening) {
-      recognitionRef.current?.stop();
-    } else {
-      setIsListening(true);
-      recognitionRef.current?.start();
-    }
-  };
-
-  const toggleSpeaking = (text: string) => {
-    if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-    } else {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.onend = () => setIsSpeaking(false);
-      setIsSpeaking(true);
-      window.speechSynthesis.speak(utterance);
-    }
-  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -205,7 +176,6 @@ export default function App() {
       }
     } catch (error) {
       console.error(error);
-      // Optional: Add a user-visible error message here if needed
     } finally {
       setIsLoading(false);
     }
@@ -217,7 +187,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden text-[13px] relative font-sans bg-white">
+    <div className="flex h-[100dvh] overflow-hidden text-[13px] relative font-sans">
       {/* Background layer */}
       {background && (
         <div 
@@ -293,22 +263,30 @@ export default function App() {
                   </div>
                 ) : (
                   chats.map((chat) => (
-                    <button
-                      key={chat.id}
-                      onClick={() => selectChat(chat)}
-                      className={cn(
-                        "w-full text-left p-3.5 rounded-xl transition-all group relative border border-transparent active:scale-[0.98]",
-                        activeChatId === chat.id ? "bg-stone-100 border-stone-200 shadow-sm" : "hover:bg-stone-50"
-                      )}
-                    >
-                      <div className="text-[14px] font-medium text-stone-700 truncate pr-4">
-                        {chat.title}
-                      </div>
-                      <div className="text-[10px] text-stone-400 mt-1 flex items-center gap-1">
-                        <RotateCcw className="w-2.5 h-2.5" />
-                        {chat.updatedAt?.toDate().toLocaleDateString('tg-TJ')}
-                      </div>
-                    </button>
+                    <div key={chat.id} className="relative group">
+                      <button
+                        onClick={() => selectChat(chat)}
+                        className={cn(
+                          "w-full text-left p-3.5 rounded-xl transition-all border border-transparent active:scale-[0.98] pr-10",
+                          activeChatId === chat.id ? "bg-stone-100 border-stone-200 shadow-sm" : "hover:bg-stone-50"
+                        )}
+                      >
+                        <div className="text-[14px] font-medium text-stone-700 truncate">
+                          {chat.title}
+                        </div>
+                        <div className="text-[10px] text-stone-400 mt-1 flex items-center gap-1">
+                          <RotateCcw className="w-2.5 h-2.5" />
+                          {chat.updatedAt?.toDate().toLocaleDateString('tg-TJ')}
+                        </div>
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteChat(e, chat.id)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-stone-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all active:scale-90"
+                        title="Нест кардан"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
@@ -348,16 +326,16 @@ export default function App() {
 
       <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden">
         {/* Top Header */}
-        <header className="flex items-center justify-between px-4 py-1 sticky top-0 w-full bg-white/90 backdrop-blur-lg z-30 border-b border-stone-100 shadow-sm">
+        <header className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-white z-30 border-b border-stone-200 shadow-sm">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsHistoryOpen(true)}
-              className="p-1 hover:bg-stone-100 active:bg-stone-200 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-stone-100 active:bg-stone-200 rounded-lg transition-colors"
             >
               <Menu className="w-5 h-5 text-stone-700" />
             </button>
             <div className="flex flex-col">
-              <span className="text-[16px] font-bold text-stone-900 tracking-tight leading-none">Қуръон ва Ҳадис</span>
+              <span className="text-[17px] font-bold text-stone-900 tracking-tight leading-none">Islam.ai</span>
             </div>
           </div>
           <button 
@@ -370,9 +348,9 @@ export default function App() {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-hidden relative">
+        <main className="flex-1 overflow-hidden relative flex flex-col">
           {isApiKeyMissing && (
-            <div className="mx-4 mt-4 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="mx-4 mt-4 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500 z-10">
               <div className="p-2 bg-rose-100 rounded-xl text-rose-600">
                 <AlertCircle className="w-5 h-5" />
               </div>
@@ -393,150 +371,177 @@ export default function App() {
               </div>
             </div>
           )}
+          
           <div 
             ref={scrollRef}
-            className="h-full overflow-y-auto px-4 pb-32 md:px-6 max-w-3xl mx-auto w-full pt-4 scroll-smooth"
+            className="flex-1 overflow-y-auto scroll-smooth pb-8 touch-pan-y overscroll-contain"
           >
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12 px-6 text-center relative z-10">
-                <div className="space-y-4">
-                  <p className="text-stone-500 text-sm md:text-base max-w-sm mx-auto leading-relaxed">
-                    Ба шумо чӣ тавр кӯмак карда метавонам? Пурсишҳои худро дар бораи дин нависед.
-                  </p>
-                </div>
-
-                {!user && (
-                  <button 
-                    onClick={() => signInWithGoogle()}
-                    className="flex items-center gap-3 px-8 py-4 bg-stone-900 text-white rounded-2xl hover:bg-stone-800 transition-all text-sm font-bold shadow-xl hover:shadow-2xl active:scale-95"
-                  >
-                    <UserIcon className="w-5 h-5" />
-                    Ворид шудан ба система
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-8 py-3">
-                <AnimatePresence mode="popLayout">
-                  {messages.map((msg, idx) => (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={cn(
-                        "flex w-full",
-                        msg.role === 'user' ? "justify-end" : "justify-start"
-                      )}
-                    >
-                      <div className={cn(
-                        "max-w-[95%] sm:max-w-[85%] relative",
-                        msg.role === 'user' 
-                          ? "bg-stone-900 text-white px-5 py-3 rounded-2xl rounded-tr-none text-[14px] shadow-lg" 
-                          : msg.text.startsWith('⚠️')
-                            ? "bg-rose-50 border border-rose-100 text-rose-800 px-5 py-4 rounded-2xl text-[14px] shadow-sm w-full"
-                            : "text-stone-800 w-full"
-                      )}>
-                        {msg.role === 'model' ? (
-                          <div className="flex gap-4">
-                            <div className="hidden sm:flex w-8 h-8 rounded-full bg-stone-100 items-center justify-center mt-1 flex-shrink-0">
-                              <Sparkles className="w-4 h-4 text-stone-800" />
-                            </div>
-                            <div className="markdown-body prose prose-stone prose-sm max-w-none text-[14.5px] leading-relaxed flex-1">
-                              <ReactMarkdown
-                                components={{
-                                  blockquote: ({ node, ...props }) => (
-                                    <div className="my-4 border-l-4 border-stone-800 bg-stone-50/80 py-3 px-4 rounded-r-xl italic text-blue-800 shadow-sm relative overflow-hidden text-[12px] leading-relaxed">
-                                      <div className="absolute top-0 right-0 p-1 opacity-5">
-                                        <BookOpen className="w-6 h-6" />
-                                      </div>
-                                      <div className="font-arabic text-[16px] leading-loose not-italic" dir="auto">
-                                        {props.children}
-                                      </div>
-                                    </div>
-                                  ),
-                                  strong: ({ node, ...props }) => (
-                                    <strong {...props} className="text-emerald-700 font-bold bg-emerald-50 px-1 rounded shadow-sm" />
-                                  ),
-                                  a: ({ node, ...props }) => {
-                                    return <a {...props} className="text-blue-600 hover:underline font-bold decoration-2 underline-offset-2" target="_blank" rel="noreferrer" />;
-                                  }
-                                }}
-                              >
-                                {msg.text}
-                              </ReactMarkdown>
-                            </div>
-                          </div>
-                        ) : (
-                          msg.text
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                
-                {isLoading && (
-                  <div className="flex items-center gap-4 py-2">
-                    <div className="relative w-10 h-10 flex items-center justify-center">
-                      <div className="absolute inset-0 border-3 border-stone-200 border-t-stone-800 rounded-full animate-spin" />
-                      <Sparkles className="w-5 h-5 text-stone-300" />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[14px] font-bold text-stone-800 animate-pulse block">Islam.ai фикр дорад...</span>
-                      <span className="text-[11px] text-stone-400 block italic">Ҷустуҷӯ дар манбаъҳои саҳеҳ</span>
-                    </div>
+            <div className="px-4 md:px-6 max-w-3xl mx-auto w-full pt-4">
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-12 px-6 text-center relative z-10">
+                  <div className="space-y-4">
+                    <p className="text-stone-500 text-sm md:text-base max-w-sm mx-auto leading-relaxed">
+                      Ба шумо чӣ тавр кӯмак карда метавонам? Пурсишҳои худро дар бораи дин нависед.
+                    </p>
                   </div>
-                )}
-              </div>
-            )}
+
+                  {!user && (
+                    <button 
+                      onClick={() => signInWithGoogle()}
+                      className="flex items-center gap-3 px-8 py-4 bg-stone-900 text-white rounded-2xl hover:bg-stone-800 transition-all text-sm font-bold shadow-xl hover:shadow-2xl active:scale-95"
+                    >
+                      <UserIcon className="w-5 h-5" />
+                      Ворид шудан ба система
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-8 py-3">
+                  <AnimatePresence mode="popLayout">
+                    {messages.map((msg, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={cn(
+                          "flex w-full",
+                          msg.role === 'user' ? "justify-end" : "justify-start"
+                        )}
+                      >
+                        <div className={cn(
+                          "max-w-[95%] sm:max-w-[85%] relative",
+                          msg.role === 'user' 
+                            ? "bg-white text-stone-900 px-5 py-3 rounded-2xl rounded-tr-none text-[14px] shadow-lg font-medium" 
+                            : msg.text.startsWith('⚠️')
+                              ? "bg-rose-500/90 backdrop-blur-md text-white px-5 py-4 rounded-2xl text-[14px] shadow-sm w-full"
+                              : "text-stone-900 w-full py-4"
+                        )}>
+                          {msg.role === 'model' ? (
+                            <div className="flex gap-4">
+                              <div className="hidden sm:flex w-8 h-8 rounded-full bg-stone-100 items-center justify-center mt-1 flex-shrink-0">
+                                <Sparkles className="w-4 h-4 text-stone-800" />
+                              </div>
+                              <div className="markdown-body prose prose-stone prose-sm max-w-none text-[14.5px] leading-relaxed flex-1">
+                                <ReactMarkdown
+                                  components={{
+                                    p: ({ node, ...props }) => {
+                                      // Helper to extract text from children for language detection
+                                      const extractText = (children: any): string => {
+                                        if (typeof children === 'string') return children;
+                                        if (Array.isArray(children)) return children.map(extractText).join('');
+                                        if (children?.props?.children) return extractText(children.props.children);
+                                        return '';
+                                      };
+
+                                      const textContent = extractText(props.children);
+                                      const isArabic = /[\u0600-\u06FF]/.test(textContent);
+                                      
+                                      return (
+                                        <p 
+                                          {...props} 
+                                          dir="auto" 
+                                          className={cn(
+                                            "mb-3 last:mb-0 leading-relaxed",
+                                            isArabic 
+                                              ? "font-arabic text-[21px] leading-loose text-right" 
+                                              : "text-left text-[14.5px]"
+                                          )}
+                                        />
+                                      );
+                                    },
+                                    blockquote: ({ node, ...props }) => (
+                                      <div className="my-4 border border-stone-200 bg-stone-50/50 py-3 px-4 rounded-xl italic text-blue-900 shadow-sm relative overflow-hidden text-[12px] leading-relaxed">
+                                        <div className="absolute top-0 right-0 p-1 opacity-5">
+                                          <BookOpen className="w-6 h-6" />
+                                        </div>
+                                        <div className="not-italic">
+                                          {props.children}
+                                        </div>
+                                      </div>
+                                    ),
+                                    strong: ({ node, ...props }) => (
+                                      <strong {...props} className="text-emerald-700 font-bold bg-emerald-50 px-1 rounded shadow-sm" />
+                                    ),
+                                    a: ({ node, ...props }) => {
+                                      return <a {...props} className="text-blue-600 hover:underline font-bold decoration-2 underline-offset-2" target="_blank" rel="noreferrer" />;
+                                    }
+                                  }}
+                                >
+                                  {msg.text}
+                                </ReactMarkdown>
+                              </div>
+                            </div>
+                          ) : (
+                            msg.text
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  
+                  {isLoading && (
+                    <div className="flex items-center gap-4 py-2">
+                      <div className="relative w-10 h-10 flex items-center justify-center">
+                        <div className="absolute inset-0 border-3 border-stone-200 border-t-stone-800 rounded-full animate-spin" />
+                        <Sparkles className="w-5 h-5 text-stone-300" />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[14px] font-bold text-stone-800 animate-pulse block">Islam.ai фикр дорад...</span>
+                        <span className="text-[11px] text-stone-400 block italic">Ҷустуҷӯ дар манбаъҳои саҳеҳ</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </main>
 
-        {/* Floating Input Bar */}
-        <div className="fixed bottom-0 left-0 w-full px-4 pb-2 bg-white/95 backdrop-blur-xl border-t border-stone-100 pt-1 z-40">
-          <div className="max-w-3xl mx-auto flex flex-col gap-1">
-            <div className="flex items-center gap-2 bg-stone-100 rounded-full p-1 shadow-inner border border-stone-200/50 transition-all focus-within:bg-white focus-within:shadow-xl focus-within:border-stone-300">
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileUpload} 
-                className="hidden" 
-              />
-              
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="ml-1 p-1.5 hover:bg-stone-200/50 rounded-full text-stone-500 transition-colors flex-shrink-0"
-                title="Илова кардани файл"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-
-
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="Савол диҳед..."
-                className="flex-1 bg-transparent py-1 px-4 border-none focus:ring-0 outline-none text-[13px] sm:text-[14px] text-stone-800 placeholder-stone-400"
-              />
-
-              <div className="flex items-center gap-1.5 pr-1">
-                <button
-                  onClick={handleSend}
-                  disabled={isLoading || !input.trim()}
-                  className="w-8 h-8 flex items-center justify-center bg-emerald-600 text-white rounded-full hover:bg-emerald-700 active:scale-90 transition-all disabled:opacity-20 shadow-lg"
+          {/* Floating Input Bar - Lowered */}
+          <div className="flex-shrink-0 w-full px-4 pb-2 pt-1 z-40 bg-gradient-to-t from-black/5 to-transparent">
+            <div className="max-w-3xl mx-auto">
+              <div className="flex items-center gap-1.5 bg-white rounded-full p-1 shadow-xl border border-stone-200 transition-all focus-within:border-stone-400 focus-within:shadow-2xl">
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileUpload} 
+                  className="hidden" 
+                />
+                
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="ml-1 p-1.5 hover:bg-stone-100 rounded-full text-stone-500 transition-colors flex-shrink-0"
+                  title="Илова кардани файл"
                 >
-                  <ArrowUp className="w-3.5 h-3.5" />
+                  <Plus className="w-4.5 h-4.5" />
                 </button>
+
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder="Савол диҳед..."
+                  className="flex-1 bg-transparent py-1 px-3 border-none focus:ring-0 outline-none text-[14px] sm:text-[14.5px] text-stone-800 placeholder-stone-400"
+                />
+
+                <div className="flex items-center gap-1 pr-0.5">
+                  <button
+                    onClick={handleSend}
+                    disabled={isLoading || !input.trim()}
+                    className="w-8 h-8 flex items-center justify-center bg-stone-900 text-white rounded-full hover:bg-stone-800 active:scale-95 transition-all disabled:opacity-20 shadow-md"
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );

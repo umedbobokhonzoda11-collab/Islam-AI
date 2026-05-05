@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
-// @ts-ignore - process.env is injected by vite.config.ts during build
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined);
+// @ts-ignore - process.env.GEMINI_API_KEY is defined by vite.config.ts
+const API_KEY = process.env.GEMINI_API_KEY;
 
 export const isApiKeyMissing = !API_KEY || API_KEY === "undefined" || API_KEY === "";
 
