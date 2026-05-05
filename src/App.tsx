@@ -11,6 +11,8 @@ import {
   Plus, 
   Sparkles,
   ArrowUp,
+  ChevronUp,
+  ChevronDown,
   BookOpen,
   Search,
   X,
@@ -96,23 +98,32 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Scroll logic: show the start of the response if it's from the model
+    // Scroll behavior: when a new model response arrives, focus on the start of it
     if (scrollRef.current && messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role === 'model' && !isLoading) {
-        // Find the last element in the message list and scroll into view roughly
-        const container = scrollRef.current;
-        const lastMsgHeaderHeight = 100; // Small buffer
-        container.scrollTo({
-          top: container.scrollHeight - 800, // Adjust to show top of long model response
-          behavior: 'smooth'
-        });
-      } else {
-        scrollRef.current.scrollTo({
-          top: scrollRef.current.scrollHeight,
-          behavior: 'smooth'
-        });
-      }
+      
+      // We use a small timeout to ensure the DOM has rendered the new content
+      const timeoutId = setTimeout(() => {
+        if (scrollRef.current) {
+          if (lastMessage.role === 'model' && !isLoading) {
+            // Find all model messages and scroll to the last one
+            const modelMessages = scrollRef.current.querySelectorAll('.model-message-container');
+            const lastModelMsg = modelMessages[modelMessages.length - 1];
+            
+            if (lastModelMsg) {
+              lastModelMsg.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          } else {
+            // For user messages or during loading, scroll to bottom
+            scrollRef.current.scrollTo({
+              top: scrollRef.current.scrollHeight,
+              behavior: 'smooth'
+            });
+          }
+        }
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [messages, isLoading]);
 
@@ -184,6 +195,14 @@ export default function App() {
   const startNewChat = () => {
     setMessages([]);
     setActiveChatId(null);
+  };
+
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const scrollToBottom = () => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   };
 
   return (
@@ -410,6 +429,7 @@ export default function App() {
                       >
                         <div className={cn(
                           "max-w-[95%] sm:max-w-[85%] relative",
+                          msg.role === 'model' && "model-message-container",
                           msg.role === 'user' 
                             ? "bg-white text-stone-900 px-5 py-3 rounded-2xl rounded-tr-none text-[14px] shadow-lg font-medium" 
                             : msg.text.startsWith('⚠️')
